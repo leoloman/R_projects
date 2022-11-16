@@ -1,0 +1,130 @@
+---
+title: "Epi Analysis of Syphilis"
+output: pdf_document
+date: '2022-07-02'
+bibliography: syphilis.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(epitools)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+
+```
+
+## Syphilis Epi Analysis
+
+An exploratory look into a 1989 Syphilis dataset, the country is unknown so I am going to base it from the UK
+
+
+```{r}
+
+setwd('../r_epi')
+source('syphilis_functions.R')
+df <- read.delim('data/syphilis/syphilis_3.txt', sep = ',')
+head(df)
+```
+
+https://statswales.gov.wales/catalogue/population-and-migration/population/estimates/nationallevelpopulationestimates-by-year-age-ukcountry
+
+# this is a dataset which has cases of syhpilis over the course of 1989 
+# split by sex, race and age
+# as I do not know what country it represents I am going to presume it
+# represents England in 1989 
+
+## Demographic
+
+```{r}
+df %>% group_by(across(Sex)) %>% summarise(percentage= round(n() / nrow(df) * 100))
+```
+We have a higher percentage of men within our dataset, this could be for a variety of reasons but as per [@Solomon] states that this std has become a concentrated epidemic within MSM during the 1980s. 
+
+reference: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4470884/
+
+Lets look at the age breakdown of our cases split by age
+```{r}
+age_density <- df %>% group_by(Age,Sex) %>% summarise(density= round(n() / nrow(df),digits=4))
+age_density$Age <- factor(age_density$Age, levels = c("<=14" ,"15-19" ,"20-24", "25-29", 
+                                     "30-34", "35-44" ,"45-54",">55"))
+
+ggplot(age_density, aes(Age,density )) + 
+  geom_col() + facet_wrap(~Sex) + theme_bw() + 
+  labs(y='Density\n', x = '\nAge') + 
+  ggtitle('Age Density')
+```
+
+The male population appears to be affected significantly more from the age of 20 to 44 compared to females where there are significant drops as they get older, dropping circa 2% as they move up the age band.
+
+This could be due to a variety of reasons, this can be dived into deeper by loooking into NATSAL-1, a sex survey which was undertaken in 1991 can give us a potential insight. There were only 3 MSM participants in the survey[@NATSAL1-Sexual-histories] but information was given on their sexual activities and number of partners:
+
+"if you go cruising that could be 7 in one night"[@NATSAL1-Sexual-histories]
+
+Further more subsequent releases of NATSAL show the age range of 25 - 44 to be more sexually active than other age ranges, this is reflected in the histogram above showing how 20 -44 have proportionally more positive cases than outside that range. 
+
+Ethnicitiy representation
+
+```{r}
+df %>% group_by(Sex,Race) %>% summarise(counts= n())
+```
+
+
+
+1989 population estimate - source: https://www.theguardian.com/news/datablog/2009/oct/21/uk-population-data-ons
+
+1989	people: 57076451,	male:	27728836, female:	29347615
+
+I will start by doing the basic relative risk of gender catching syphilis, I have the 1989 population estimates for male and females as sourced from 'The Guardian' who have sourced it from the 'Office of National Statistics'
+
+
+```{r}
+gender_s_counts <- df %>% group_by(across(Sex)) %>% summarise(counts= n()) 
+gender_s_counts <- as.data.frame(gender_s_counts %>% left_join(data.frame(Sex = c('Female','Male'), Population = c(29347615,27728836))) %>% mutate(Population = Population - counts))
+gender_s_counts$counts <- as.numeric(gender_s_counts$counts )
+gender_s_counts$Population <- as.numeric(gender_s_counts$Population )
+
+rr_plot_caption <- paste0('Female Population: ',gender_s_counts[1,3],'\nMale Population: ',gender_s_counts[2,3],'\nFemale Cases: ',gender_s_counts[1,2],'\nMale Cases: ',gender_s_counts[2,2])
+
+gender_s_counts <- matrix(c(gender_s_counts[1,3],gender_s_counts[2,3],gender_s_counts[1,2],gender_s_counts[2,2]), nrow=2)
+
+dimnames(gender_s_counts) <- list("Behavior type" =c("Female", "Male"),
+                       "Outcome" =  c("Negative Syp", "Positive Syp")
+                      )
+
+risk_ratio_male <- riskratio(gender_s_counts)$measure
+
+risk_ratio_male <- data.frame(gender = c('Male'), 
+              lower = c(risk_ratio_male[2,2]), 
+              est = c(risk_ratio_male[2,1]),  
+              upper =c(risk_ratio_male[2,3])
+              )
+ggplot(risk_ratio_male, aes(gender, est)) + 
+  geom_point(size=2) + 
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.1) + 
+  geom_hline(yintercept=1) + 
+  coord_trans(y='log10') + 
+  labs(y='Risk Ratio', x='', caption = rr_plot_caption) + 
+  ggtitle('Relative risk of Male catching syphilis against female') + 
+  theme_bw()
+```
+
+# Estimate Age band Relative Risk
+Using the 1991 Age band population estimates
+
+https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland
+
+Lets use our relative_risk_age function which loads the ONS Census '91 survey data to give use age estimates for our respective age bands. 
+```{r}
+relative_risk_age(df)
+```
+
+
+```{r}
+relative_risk_age(df, 'Male')
+```
+```{r}
+relative_risk_age(df, 'Female')
+```
+
