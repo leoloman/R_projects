@@ -22,9 +22,8 @@ An exploratory look into a 1989 Syphilis dataset, the country is unknown so I am
 
 ```{r}
 
-setwd('../r_epi')
 source('syphilis_functions.R')
-df <- read.delim('data/syphilis/syphilis_3.txt', sep = ',')
+df <- read.delim('data/syphilis_3.txt', sep = ',')
 head(df)
 ```
 
