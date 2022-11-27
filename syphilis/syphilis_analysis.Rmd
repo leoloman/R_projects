@@ -1,24 +1,26 @@
 ---
 title: "Epi Analysis of Syphilis"
 output: pdf_document
-date: '2022-07-02'
+date: '2022-'
 bibliography: syphilis.bib
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
 library(epitools)
 library(dplyr)
 library(ggplot2)
 library(readxl)
+library(stringr)
 
 ```
 
 ## Syphilis Epi Analysis
 
-An exploratory look into a 1989 Syphilis dataset, the country is unknown so I am going to base it from the UK
+An case study into a 1989 Syphilis dataset, the country is unknown but due to the demographic split I assume it would be in a Southern state of America - I am going to use Georgia as the potential state to base all my population based analysis on. 
 
+Race data extracted table 5
+Age Sex Race data extracted table 6
 
 ```{r}
 
@@ -27,7 +29,6 @@ df <- read.delim('data/syphilis_3.txt', sep = ',')
 head(df)
 ```
 
-https://statswales.gov.wales/catalogue/population-and-migration/population/estimates/nationallevelpopulationestimates-by-year-age-ukcountry
 
 # this is a dataset which has cases of syhpilis over the course of 1989 
 # split by sex, race and age
@@ -70,17 +71,19 @@ df %>% group_by(Sex,Race) %>% summarise(counts= n())
 ```
 
 
-
-1989 population estimate - source: https://www.theguardian.com/news/datablog/2009/oct/21/uk-population-data-ons
-
-1989	people: 57076451,	male:	27728836, female:	29347615
-
-I will start by doing the basic relative risk of gender catching syphilis, I have the 1989 population estimates for male and females as sourced from 'The Guardian' who have sourced it from the 'Office of National Statistics'
+I will start by doing the basic relative risk of gender catching syphilis
 
 
 ```{r}
+demographic_data <- read.csv('data/gender_age_ethnicity_breakdown.csv', skip = 1)
+demographic_data$Gender <- tolower(demographic_data$Gender)
+
+sex_total <- demographic_data %>% group_by(Gender) %>% summarise(counts = sum(count))
+```
+
+```{r}
 gender_s_counts <- df %>% group_by(across(Sex)) %>% summarise(counts= n()) 
-gender_s_counts <- as.data.frame(gender_s_counts %>% left_join(data.frame(Sex = c('Female','Male'), Population = c(29347615,27728836))) %>% mutate(Population = Population - counts))
+gender_s_counts <- as.data.frame(gender_s_counts %>% left_join(data.frame(Sex = c('Female','Male'), Population = c(sex_total[1,2]$counts,sex_total[2,2]$counts))) %>% mutate(Population = Population - counts))
 gender_s_counts$counts <- as.numeric(gender_s_counts$counts )
 gender_s_counts$Population <- as.numeric(gender_s_counts$Population )
 
@@ -110,20 +113,19 @@ ggplot(risk_ratio_male, aes(gender, est)) +
 ```
 
 # Estimate Age band Relative Risk
-Using the 1991 Age band population estimates
+Using the 1990 Age band population estimates
 
-https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland
-
-Lets use our relative_risk_age function which loads the ONS Census '91 survey data to give use age estimates for our respective age bands. 
+ 
 ```{r}
-relative_risk_age(df)
+
+relative_risk_age(df,  path = 'data/gender_age_ethnicity_breakdown.csv')
 ```
 
 
 ```{r}
-relative_risk_age(df, 'Male')
+relative_risk_age(df, 'Male',path = 'data/gender_age_ethnicity_breakdown.csv')
 ```
 ```{r}
-relative_risk_age(df, 'Female')
+relative_risk_age(df, 'Female',path = 'data/gender_age_ethnicity_breakdown.csv')
 ```
 
